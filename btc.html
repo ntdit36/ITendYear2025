@@ -47,7 +47,7 @@
 
       <h1>Check-in Ban Tổ Chức</h1>
       <div class="sub">Dành cho thành viên BTC nhận thẻ và số.</div>
-      <div class="pill">Đã tham gia: <span id="btcCount">0</span> / 3</div>
+      <div class="pill">Đã tham gia: <span id="btcCount" data-btc-count>0</span> / 3</div>
     </div>
 
     <div class="btc-card">
@@ -77,6 +77,32 @@ import {
   onSnapshot          // <-- thêm dòng này
 } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const attendeesCol = collection(db, 'attendees');
+const BTC_LIMIT = 3;
+// ====================== REALTIME COUNTER BTC ======================
+function listenBTCCount() {
+  onSnapshot(attendeesCol, (snap) => {
+    const docs = snap.docs.map(d => d.data());
+
+    // Đếm chỉ những người có role = BTC
+    const btcCount = docs.filter(d =>
+      String(d.role || '').toUpperCase() === 'BTC'
+    ).length;
+
+    document.querySelectorAll('[data-btc-count]').forEach(el => {
+      el.textContent = btcCount;
+    });
+
+    // console.log('Realtime btcCount =', btcCount);
+  }, (err) => {
+    console.error('Lỗi onSnapshot BTC:', err);
+  });
+}
+
+listenBTCCount();
+// ====================== HẾT PHẦN REALTIME ======================
 
 
   const firebaseConfig = {
@@ -216,5 +242,6 @@ await setDoc(ref, {
 </footer>
 </body>
 </html>
+
 
 
