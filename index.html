@@ -87,13 +87,15 @@
 <script type="module">
   // --- Firebase setup ---
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
-  import {
+import {
   getFirestore,
   collection,
   doc,
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot          // <-- thêm dòng này
 } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
+
 
   const firebaseConfig = {
   apiKey: "AIzaSyAXtnsgM2cu7IdOOq5ZMPuNHpcUtTc_93g",
@@ -108,6 +110,23 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const attendeesCol = collection(db, 'attendees');
+// Lắng nghe realtime số người đã tham gia từ Firestore
+function listenJoinedCount() {
+  onSnapshot(attendeesCol, (snap) => {
+    const docs = snap.docs.map(d => d.data());
+    // GUEST = mọi người KHÔNG phải BTC
+    const guestCount = docs.filter(d => String(d.role || '').toUpperCase() !== 'BTC').length;
+
+    const joinedSpan = document.getElementById('joined');
+    const totalSpan  = document.getElementById('total');
+
+    if (joinedSpan) joinedSpan.textContent = guestCount;
+    if (totalSpan)  totalSpan.textContent  = TOTAL;  // 47
+  });
+}
+
+// gọi ngay khi load trang
+listenJoinedCount();
 
   // --- Phần logic cũ (localStorage + random team/number) giữ nguyên ---
 
@@ -225,3 +244,4 @@ await setDoc(ref, {
 
 </body>
 </html>
+
