@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Check-in — Kết quả</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050816;
+      --muted: #9aa4b2;
+      --gold: #f5c242;
+      --accent1: #4f46e5;
+      --accent2: #6366f1;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: #e5edff;
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-1;
+      background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="104" viewBox="0 0 120 104"><defs><pattern id="p" width="60" height="52" patternUnits="userSpaceOnUse"><path d="M30 0 L60 15 L60 37 L30 52 L0 37 L0 15 Z" fill="none" stroke="%234b5563" stroke-opacity="0.25" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23p)"/></svg>');
+      opacity:.35;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;       /* card không bị lệch vert nữa */
+      justify-content: center;
+      padding: 48px 12px 32px;
+    }
+
+    .result-shell {
+      width: 100%;
+      max-width: 620px;              /* rộng hơn 1 chút giống hình */
+      text-align: center;
+      margin: 0 auto;
+    }
+
+    .header-label {
+      letter-spacing: .18em;
+      font-size: 28px;
+      text-transform: uppercase;
+      color: #60a5fa;
+      margin-bottom: 6px;
+    }
+
+    #nameDisplay {
+      font-size: 40px;
+      font-weight: 800;
+      margin: 0 0 22px;
+      color: #f9fafb;
+    }
+
+    .ticket-card {
+      display: block;
+      width: 100%;
+      max-width: 620px;
+      margin: 0 auto;                /* card luôn nằm chính giữa */
+      border-radius: 28px;
+      padding: 26px 24px 20px;
+      background: radial-gradient(circle at 0% 0%, rgba(96,165,250,.35), transparent 55%),
+                  radial-gradient(circle at 100% 0%, rgba(129,140,248,.4), transparent 55%),
+                  #020617;
+      border: 1px solid rgba(148,163,184,.2);
+      box-shadow: 0 30px 70px rgba(15,23,42,.9);
+    }
+
+    .ticket-top {
+      display:flex;
+      justify-content:center;   /* => hai vòng tròn nằm ở giữa card */
+      align-items:center;
+      gap:64px;                 /* khoảng cách giữa 2 vòng tròn */
+      margin-bottom:18px;
+    }
+    .ticket-col {
+      flex:0 0 auto;
+      text-align:center;
+    }
+    .ticket-label {
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      color: var(--muted);
+      margin-bottom:10px;
+      
+    }
+    .circle {
+      width:110px;
+      height:110px;
+      border-radius:999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:36px;
+    }
+    .team-circle {
+      background: radial-gradient(circle at 30% 10%, #60a5fa, #312e81);
+      box-shadow: inset 0 0 0 6px rgba(129,140,248,.35);
+      color:#e5edff;
+    }
+
+    .num-circle {
+      background: radial-gradient(circle at 30% 10%, #facc15, #78350f);
+      box-shadow: inset 0 0 0 6px rgba(250,204,21,.4);
+      color: var(--gold);
+    }
+
+    .slogan-box {
+      margin-top:18px;
+      padding:16px 14px;
+      border-radius:20px;
+      background:rgba(15,23,42,.9);
+      border:1px solid rgba(148,163,184,.25);
+      font-style:italic;
+      font-size:14px;
+    }
+
+    .next-wrapper {
+      margin-top:30px;
+      display:flex;
+      justify-content:center;
+    }
+
+    #nextBtn {
+      border-radius:999px;
+      padding:13px 30px;
+      border:none;
+      background:#f9fafb;
+      color:#111827;
+      font-weight:700;
+      font-size:15px;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 16px 40px rgba(15,23,42,.8);
+    }
+    #nextBtn svg { flex-shrink:0; }
+
+    .hint {
+      margin-top:14px;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .gear-btn{
+      position:fixed;
+      right:14px;
+      top:14px;
+      width:38px;
+      height:38px;
+      border-radius:12px;
+      border:1px solid rgba(148,163,184,.35);
+      background:rgba(15,23,42,.9);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      z-index:40;
+    }
+
+    .confetti{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:10;overflow:hidden}
+    .confetti i{position:absolute;width:10px;height:18px;border-radius:2px;animation:fall 3000ms linear infinite}
+    @keyframes fall{0%{transform: translateY(-10vh) rotate(0);opacity:1}100%{transform: translateY(120vh) rotate(420deg);opacity:0.6}}
+
+    @media(max-width:640px){
+      .ticket-card{border-radius:24px;padding:22px 16px;}
+      .ticket-top{gap:18px;}
+      .circle{width:96px;height:96px;font-size:32px;}
+      #nameDisplay{font-size:34px;}
+    }
+    .site-footer {
+  position: fixed;         /* luôn dính cuối màn hình */
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;          /* tương đương text-slate-600 */
+  padding: 16px 0;         /* tương đương p-4 */
+  pointer-events: none;    /* để không che nút bấm phía trên */
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Gear Admin -->
+  <a class="gear-btn" href="admin.html" onclick="requireAdmin(event)" title="Xem trang Admin">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82L4.21 6.21a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </a>
+
+  <div class="page">
+    <div class="result-shell">
+      <div class="header-label">IT TEAM CHÀO MỪNG</div>
+      <div id="nameDisplay">Người tham gia</div>
+
+      <div class="ticket-card">
+        <div class="ticket-top">
+          <div class="ticket-col">
+            <div class="ticket-label">TEAM CỦA BẠN</div>
+            <div class="circle team-circle" id="teamVal">-</div>
+          </div>
+          <div class="ticket-col">
+            <div class="ticket-label">SỐ MAY MẮN</div>
+            <div class="circle num-circle" id="numVal">-</div>
+          </div>
+        </div>
+
+        <div class="slogan-box" id="slogan">"Hãy chụp màn hình lại để lưu số thứ tự  và team của bạn!"</div>
+      </div>
+
+      <div class="next-wrapper">
+        <button id="nextBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4L7 8l4 4"></path><path d="M7 8h7a4 4 0 0 1 0 8h-1"></path>
+          </svg>
+          Quét Người Tiếp Theo
+        </button>
+      </div>
+
+      <div class="hint">Hãy chụp màn hình lại để lưu số thứ tự  và team của bạn!</div>
+    </div>
+  </div>
+
+  <div class="confetti" id="confetti"></div>
+
+<script>
+ // ==== CẤU HÌNH LOCALSTORAGE ====
+  const KEY  = 'participants_v1';
+  const IDX  = 'lastEntryIndex';
+  const TOTAL = 47;
+
+  // ==== SLOGAN KHÁCH ====
+  const guestSlogans = [
+    "Vui vẻ không quạu nha!",
+    "Làm hết sức, chơi hết mình!",
+    "Đoàn kết là chấp hết!",
+    "Thắng không kiêu, bại không nản!",
+    "Ăn chơi sợ gì mưa rơi!",
+    "Bùng nổ đạp đổ thách thức!",
+    "Anh em mình là cái gì nào?",
+    "Thích thì chiều, liều thì chiến!",
+    "Đi đu đưa đi!",
+    "Chơi là phải chất!",
+    "Hết mình vì đội nhóm!",
+    "Quyết chiến quyết thắng!",
+    "Ngại gì vết bẩn!",
+    "Cùng nhau tỏa sáng!",
+    "Biệt đội siêu anh hùng!",
+    "Không say không về!",
+    "Mãi bên nhau bạn nhé!",
+    "Tuổi trẻ này mình cùng nhau!",
+    "Đường đua rực lửa!",
+    "Chiến thần gánh team!"
+  ];
+
+  // ==== SLOGAN BTC ====
+  const btcSlogans = [
+    "Người nắm giữ cuộc chơi",
+    "Quyền lực tối thượng",
+    "Trùm cuối xuất hiện",
+    "Ban Tổ Chức quyền năng",
+    "Thắng thua do bạn (BTC)",
+    "Master of the Game"
+  ];
+
+  // ==== HÀM TIỆN ÍCH ====
+  function loadAll(){
+    try {
+      return JSON.parse(localStorage.getItem(KEY) || '[]');
+    } catch(e){
+      console.error(e);
+      return [];
+    }
+  }
+
+  function getLastIndex(){
+    const v = localStorage.getItem(IDX);
+    if (v === null) return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function startConfetti(){
+    const conf = document.getElementById('confetti');
+    conf.innerHTML = '';
+    const colors = ['#ffd700','#ff4d6d','#6ee7b7','#7c3aed','#60a5fa','#f97316'];
+    for (let i = 0; i < 60; i++){
+      const e = document.createElement('i');
+      e.style.left = Math.random()*100 + '%';
+      e.style.top = (-10 + Math.random()*10) + 'vh';
+      e.style.width = (6 + Math.random()*8) + 'px';
+      e.style.height = (10 + Math.random()*12) + 'px';
+      e.style.background = colors[Math.floor(Math.random()*colors.length)];
+      e.style.transform = 'rotate('+Math.random()*360+'deg)';
+      e.style.animationDuration = (2000 + Math.random()*2200) + 'ms';
+      e.style.animationDelay = (Math.random()*200) + 'ms';
+      conf.appendChild(e);
+    }
+    setTimeout(()=>{ conf.innerHTML=''; }, 4500);
+  }
+
+  // ==== HÀM CHÍNH HIỂN THỊ RECORD ====
+  function showRecord(rec){
+    const nameEl   = document.getElementById('nameDisplay');
+    const teamEl   = document.getElementById('teamVal');
+    const numEl    = document.getElementById('numVal');
+    const sloganEl = document.getElementById('slogan');
+
+    if (!rec){
+      nameEl.textContent   = 'Không có dữ liệu';
+      teamEl.textContent   = '-';
+      numEl.textContent    = '-';
+      sloganEl.textContent = 'Không có bản ghi để hiển thị.';
+      return;
+    }
+
+    // Tên
+    nameEl.textContent = rec.name || 'Người tham gia';
+
+    // BTC hay Khách?
+    const isBTC = String(rec.role || '').toUpperCase() === 'BTC' ||
+                  String(rec.teamLabel || '').toUpperCase() === 'BTC';
+
+    // Team & Số
+    teamEl.textContent = isBTC ? 'BTC' : (rec.team || rec.teamLabel || '-');
+    numEl.textContent  = '#' + (rec.number || '-');
+
+    // Slogan
+    if (isBTC){
+      let s;
+      if (rec.slogan && String(rec.slogan).trim()){
+        // nếu record có slogan riêng thì ưu tiên dùng
+        s = rec.slogan;
+      } else {
+        // ngược lại chọn 1 câu trong mảng btcSlogans theo số may mắn
+        const idxBtc = (Number(rec.number) || 0) % btcSlogans.length;
+        s = btcSlogans[idxBtc];
+      }
+      sloganEl.textContent = '"' + s + '"';
+    } else {
+      const idxGuest = (Number(rec.number) || 0) % guestSlogans.length;
+      sloganEl.textContent = '"' + guestSlogans[idxGuest] + '"';
+    }
+
+    startConfetti();
+  }
+
+  // ==== LẤY BẢN GHI CUỐI & HIỂN THỊ ====
+  (function initResult(){
+    const arr = loadAll();
+    let idx = getLastIndex();
+    if (idx === null){
+      idx = arr.length ? arr.length - 1 : null;
+    }
+    const rec = (idx !== null && arr[idx]) ? arr[idx] : null;
+    showRecord(rec);
+  })();
+
+  // ==== NÚT QUÉT NGƯỜI TIẾP THEO ====
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    localStorage.removeItem(IDX);
+    window.location.href = 'index.html';
+  });
+
+  // ==== LẮNG NGHE THAY ĐỔI LOCALSTORAGE (nếu page khác ghi thêm) ====
+  window.addEventListener('storage', (e) => {
+    if (e.key === KEY || e.key === IDX){
+      const arr = loadAll();
+      let idx = getLastIndex();
+      if (idx === null && arr.length) idx = arr.length - 1;
+      const rec = (idx !== null && arr[idx]) ? arr[idx] : null;
+      showRecord(rec);
+    }
+  });
+</script>
+
+  
+
+<!-- ADMIN PROTECTOR -->
+<script>
+  const ADMIN_PASSWORD = 'admin2025';
+  function requireAdmin(e){
+    if(e && e.preventDefault) e.preventDefault();
+    if(sessionStorage.getItem('admin_auth') === '1'){
+      window.location.href = 'admin.html';
+      return;
+    }
+    const pw = prompt('Nhập mật khẩu Admin để xem trang Quản lý:');
+    if(pw === null) return;
+    if(pw === ADMIN_PASSWORD){
+      sessionStorage.setItem('admin_auth','1');
+      window.location.href = 'admin.html';
+    } else {
+      alert('Mật khẩu không đúng.');
+    }
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.querySelectorAll('a[href$="admin.html"]').forEach(a=>{
+      a.addEventListener('click', requireAdmin);
+    });
+  });
+</script>
+<footer class="site-footer">
+  © 2025 Eddy – Web Developer. 47 Slots System.
+</footer>
+
+</body>
+</html>

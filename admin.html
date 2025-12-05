@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Quản Lý Đội & BTC — Firestore</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0f1724;
+      --muted:#9aa4b2;
+      --accent:#4f46e5;
+      --danger:#e11d48;
+      --gold:#f5c242;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:#e6eef8}
+    .page{max-width:1200px;margin:28px auto;padding:22px;}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.04));border:1px solid rgba(255,255,255,0.03);padding:18px;border-radius:12px;box-shadow:0 14px 40px rgba(2,6,23,0.6);}
+    .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .page-header h3{margin:0;font-weight:800}
+    .header-actions{display:flex;gap:10px;align-items:center}
+    .muted{color:var(--muted)}
+
+    .teams-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .team-badge{min-width:84px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);text-align:center;color:#dfe9ff;font-weight:700;cursor:pointer;user-select:none;transition:all .16s}
+    .team-badge .id{font-size:18px;color:var(--accent);font-weight:900}
+    .team-badge .cap{font-size:12px;color:var(--muted);margin-top:6px}
+    .team-badge.active{box-shadow:0 12px 30px rgba(79,70,229,0.12);transform:translateY(-4px);border-color:rgba(127,90,255,0.24);background:linear-gradient(90deg,rgba(79,70,229,0.08),rgba(124,58,237,0.04))}
+    .team-badge.btc .id{color:#ff7a5a}
+    .team-badge.btc{background:linear-gradient(90deg,rgba(239,68,68,0.06),rgba(249,115,22,0.03))}
+
+    .table-wrap{margin-top:14px;border-radius:10px;overflow:hidden}
+    table.table{margin-bottom:0}
+    table thead th{color:var(--muted);border-bottom:1px solid rgba(255,255,255,0.03)}
+    .badge-team{background:var(--danger);color:#fff;padding:6px 10px;border-radius:999px;font-weight:700}
+    .btn-ico{width:36px;height:36px;border-radius:8px;padding:6px;display:inline-flex;align-items:center;justify-content:center}
+
+    @media(max-width:900px){
+      .teams-row{justify-content:center}
+    }
+    .site-footer {
+  position: fixed;         /* luôn dính cuối màn hình */
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;          /* tương đương text-slate-600 */
+  padding: 16px 0;         /* tương đương p-4 */
+  pointer-events: none;    /* để không che nút bấm phía trên */
+}
+
+  </style>
+</head>
+<body>
+
+<script>
+  // Bảo vệ mật khẩu trên chính admin.html (dùng chung với các trang khác)
+  const ADMIN_PASSWORD = '2025';
+  if (sessionStorage.getItem('admin_auth') !== '1') {
+    const pw = prompt('Nhập mật khẩu Admin để vào trang quản lý:');
+    if (pw === ADMIN_PASSWORD) {
+      sessionStorage.setItem('admin_auth','1');
+    } else {
+      alert('Sai mật khẩu.');
+      window.location.href = 'index.html';
+    }
+  }
+</script>
+
+<div class="page">
+  <div class="page-header">
+    <h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="#9fc3ff" stroke-width="1.2" style="vertical-align:middle;margin-right:8px">
+        <path d="M10 2c3 0 6 1.2 6 4v3"></path><path d="M4 6v-1c0-2.5 4-4 8-4s8 1.5 8 4v1"></path>
+      </svg>
+      Quản Lý Đội & BTC
+    </h3>
+    <div class="header-actions">
+      <a href="index.html" class="muted" style="text-decoration:underline">Quay lại Game</a>
+      <button id="exportCsv" class="btn btn-success btn-sm">Xuất Excel (CSV)</button>
+      <button id="sortBtn" class="btn btn-outline-light btn-sm">Sắp xếp: <span id="sortLabel">Không</span></button>
+      <button id="resetAll" class="btn btn-outline-danger btn-sm">Reset Dữ Liệu Firestore</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="teams-row" id="teamsRow"></div>
+
+    <div class="table-wrap mt-3">
+      <table class="table table-dark table-borderless align-middle">
+        <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>TÊN</th>
+          <th>VAI TRÒ</th>
+          <th>ĐỘI</th>
+          <th style="width:110px">SỐ</th>
+          <th>AI SLOGAN</th>
+          <th>GIỜ</th>
+          <th style="width:120px">HÀNH ĐỘNG</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal sửa -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Chỉnh sửa bản ghi</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label small text-muted">Tên</label>
+          <input id="editName" class="form-control"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted">Vai trò</label>
+          <select id="editRole" class="form-select">
+            <option value="">Khách</option>
+            <option value="BTC">BTC</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted">Đội (TEAM x hoặc BTC)</label>
+          <input id="editTeam" class="form-control" placeholder="Ví dụ: TEAM 3 hoặc BTC"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted">Số</label>
+          <input id="editNumber" type="number" class="form-control"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted">AI Slogan</label>
+          <input id="editSlogan" class="form-control" placeholder="Tùy chọn"/>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button id="saveEdit" class="btn btn-primary">Lưu</button>
+        <button class="btn btn-outline-light" data-bs-dismiss="modal">Hủy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- FIRESTORE + LOGIC ADMIN -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+  import {
+    getFirestore,
+    collection,
+    query,
+    orderBy,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    writeBatch
+  } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
+
+ const firebaseConfig = {
+  apiKey: "AIzaSyAXtnsgM2cu7IdOOq5ZMPuNHpcUtTc_93g",
+  authDomain: "it2025-c6ed8.firebaseapp.com",
+  projectId: "it2025-c6ed8",
+  storageBucket: "it2025-c6ed8.firebasestorage.app",
+  messagingSenderId: "784468579580",
+  appId: "1:784468579580:web:1b981ba6370aa7cf1b7379",
+  measurementId: "G-ERVN4JE01P"
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const attendeesCol = collection(db, 'attendees');
+
+  // cấu hình team
+  const config = {
+    total: 47,
+    teams: [
+      { id: 1, capacity: 4 },
+      { id: 2, capacity: 4 },
+      { id: 3, capacity: 4 },
+      { id: 4, capacity: 4 },
+      { id: 5, capacity: 4 },
+      { id: 6, capacity: 4 },
+      { id: 7, capacity: 5 },
+      { id: 8, capacity: 5 },
+      { id: 9, capacity: 5 },
+      { id: 10, capacity: 5 }
+    ],
+    btcCapacity: 3
+  };
+
+  const teamsRow = document.getElementById('teamsRow');
+  const tableBody = document.getElementById('tableBody');
+  const exportBtn = document.getElementById('exportCsv');
+  const resetBtn = document.getElementById('resetAll');
+  const sortBtn = document.getElementById('sortBtn');
+  const sortLabel = document.getElementById('sortLabel');
+
+  const editModalEl = document.getElementById('editModal');
+  const editModal = new bootstrap.Modal(editModalEl);
+  const editName = document.getElementById('editName');
+  const editRole = document.getElementById('editRole');
+  const editTeam = document.getElementById('editTeam');
+  const editNumber = document.getElementById('editNumber');
+  const editSlogan = document.getElementById('editSlogan');
+  const saveEditBtn = document.getElementById('saveEdit');
+
+  let participants = [];   // [{id, name, role, team, ...}]
+  let filterTeam = null;   // null | number | 'BTC'
+  let editIndex = null;
+  let sortState = null;    // null | 'asc' | 'desc'
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+  function roleOf(rec){
+    const r = (rec.role || '').toString().toUpperCase();
+    if(r === 'BTC') return 'BTC';
+    if((rec.teamLabel || '').toString().toUpperCase() === 'BTC') return 'BTC';
+    return 'KHÁCH';
+  }
+
+  function teamLabelOf(rec){
+    if((rec.teamLabel || '').toString().toUpperCase() === 'BTC') return 'BTC';
+    if(rec.teamLabel) return rec.teamLabel;
+    if(rec.team) return 'TEAM ' + rec.team;
+    return '-';
+  }
+
+  function countInTeamId(id){
+    if(String(id).toUpperCase() === 'BTC'){
+      return participants.filter(p => roleOf(p) === 'BTC').length;
+    } else {
+      const tid = Number(id);
+      return participants.filter(p =>
+        Number(p.team) === tid ||
+        (String(p.teamLabel || '').toUpperCase() === ('TEAM ' + tid).toUpperCase())
+      ).length;
+    }
+  }
+
+  function renderTeams(){
+    teamsRow.innerHTML = '';
+    config.teams.forEach(t => {
+      const used = countInTeamId(t.id);
+      const el = document.createElement('div');
+      el.className = 'team-badge' + (String(filterTeam) === String(t.id) ? ' active' : '');
+      el.innerHTML = `<div style="font-size:12px;color:var(--muted)">TEAM</div>
+                      <div class="id">${t.id}</div>
+                      <div class="cap">${used}/${t.capacity}</div>`;
+      el.addEventListener('click', () => {
+        filterTeam = (filterTeam == t.id ? null : t.id);
+        renderTable();
+        renderTeams();
+      });
+      teamsRow.appendChild(el);
+    });
+
+    const btcUsed = countInTeamId('BTC');
+    const btcEl = document.createElement('div');
+    btcEl.className = 'team-badge btc' + (filterTeam === 'BTC' ? ' active' : '');
+    btcEl.innerHTML = `<div style="font-size:12px;color:var(--muted)">BTC</div>
+                       <div class="id">ADM</div>
+                       <div class="cap">${btcUsed}/${config.btcCapacity}</div>`;
+    btcEl.addEventListener('click', () => {
+      filterTeam = (filterTeam === 'BTC' ? null : 'BTC');
+      renderTable();
+      renderTeams();
+    });
+    teamsRow.appendChild(btcEl);
+  }
+
+  function renderTable(){
+    tableBody.innerHTML = '';
+    let list = participants.slice();
+
+    // filter
+    if(filterTeam !== null){
+      if(String(filterTeam).toUpperCase() === 'BTC'){
+        list = list.filter(p => roleOf(p) === 'BTC');
+      } else {
+        const tid = Number(filterTeam);
+        list = list.filter(p =>
+          Number(p.team) === tid ||
+          (String(p.teamLabel || '').toUpperCase() === ('TEAM ' + tid).toUpperCase())
+        );
+      }
+    }
+
+    // sort
+    if(sortState === 'asc'){
+      list.sort((a,b) => (Number(a.number)||0) - (Number(b.number)||0));
+    } else if(sortState === 'desc'){
+      list.sort((a,b) => (Number(b.number)||0) - (Number(a.number)||0));
+    } else {
+      list.sort((a,b) => {
+        const ta = a.createdAt ? a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime() : 0;
+        return ta - tb;
+      });
+    }
+
+    list.forEach((p, idx) => {
+      const tr = document.createElement('tr');
+      const timeStr = p.createdAt
+        ? (p.createdAt.toDate ? p.createdAt.toDate().toLocaleTimeString() : new Date(p.createdAt).toLocaleTimeString())
+        : '';
+
+      const role = roleOf(p);
+      const teamLabel = teamLabelOf(p);
+
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td style="font-weight:700">${escapeHtml(p.name || '')}</td>
+        <td>${role === 'BTC'
+              ? '<span class="badge-team">BTC</span>'
+              : '<span style="color:var(--muted);font-weight:700">Khách</span>'}</td>
+        <td><span style="display:inline-block;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.02)">${escapeHtml(teamLabel)}</span></td>
+        <td style="color:var(--gold);font-weight:800">#${escapeHtml(p.number || '')}</td>
+        <td style="color:var(--muted)">${escapeHtml(p.slogan || '')}</td>
+        <td style="color:var(--muted)">${timeStr}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-light btn-ico btn-edit" data-id="${p.id}">✏️</button>
+          <button class="btn btn-sm btn-outline-danger btn-ico btn-del" data-id="${p.id}">🗑️</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    tableBody.querySelectorAll('.btn-edit').forEach(b => b.addEventListener('click', onEditClick));
+    tableBody.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', onDeleteClick));
+  }
+
+  async function loadFromFirestore(){
+    const q = query(attendeesCol, orderBy('createdAt','asc'));
+    const snap = await getDocs(q);
+    participants = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderTeams();
+    renderTable();
+  }
+
+  // ---- Edit / Delete ----
+  function onEditClick(e){
+    const id = e.currentTarget.dataset.id;
+    const idx = participants.findIndex(p => p.id === id);
+    if(idx === -1) return;
+    editIndex = idx;
+    const rec = participants[idx];
+    editName.value = rec.name || '';
+    editRole.value = rec.role || '';
+    editTeam.value = rec.teamLabel || (rec.team ? 'TEAM ' + rec.team : '');
+    editNumber.value = rec.number || '';
+    editSlogan.value = rec.slogan || '';
+    editModal.show();
+  }
+
+  saveEditBtn.addEventListener('click', async ()=>{
+    if(editIndex === null) return;
+    const rec = participants[editIndex];
+
+    const newName   = editName.value.trim();
+    const newRole   = editRole.value.trim();
+    const teamVal   = editTeam.value.trim();
+    const newNumber = editNumber.value ? Number(editNumber.value) : null;
+    const newSlogan = editSlogan.value.trim();
+
+    // check trùng số trong list hiện tại
+    if(newNumber){
+      const collision = participants.some((p, i) => i !== editIndex && Number(p.number) === newNumber);
+      if(collision){
+        alert('Số này đã tồn tại trong danh sách. Chọn số khác.');
+        return;
+      }
+    }
+
+    // tính team / teamLabel
+    let newTeamLabel = teamVal || rec.teamLabel || '';
+    let newTeam = rec.team || null;
+    const m = /TEAM\s*(\d+)/i.exec(teamVal);
+    if(m){
+      newTeam = Number(m[1]);
+      newTeamLabel = 'TEAM ' + newTeam;
+    }
+    if(teamVal.toUpperCase() === 'BTC'){
+      newTeamLabel = 'BTC';
+      // team có thể vẫn giữ hoặc null, tuỳ bạn
+    }
+
+    const docRef = doc(db, 'attendees', rec.id);
+    await updateDoc(docRef, {
+      name: newName || null,
+      role: newRole || null,
+      team: newTeam || null,
+      teamLabel: newTeamLabel || null,
+      number: newNumber || null,
+      slogan: newSlogan || null
+    });
+
+    // update local state
+    participants[editIndex] = {
+      ...rec,
+      name: newName,
+      role: newRole,
+      team: newTeam,
+      teamLabel: newTeamLabel,
+      number: newNumber,
+      slogan: newSlogan
+    };
+
+    editModal.hide();
+    renderTeams();
+    renderTable();
+  });
+
+  async function onDeleteClick(e){
+  const id = e.currentTarget.dataset.id;
+  const rec = participants.find(p => p.id === id);
+  if (!rec) return;
+
+  if (!confirm(`Xóa "${rec.name}" khỏi danh sách?`)) return;
+
+  // 1) Xóa trên Firestore
+  await deleteDoc(doc(db, 'attendees', id));
+  participants = participants.filter(p => p.id !== id);
+  renderTeams();
+  renderTable();
+
+  // 2) Xóa luôn trong localStorage để index/btc cập nhật đúng
+  try {
+    const KEY = 'participants_v1';
+    const IDX = 'lastEntryIndex';
+
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      let list = JSON.parse(raw);
+
+      // lọc bỏ bản ghi cùng name + number + role (nếu có)
+      list = list.filter(p => !(
+        String(p.name || '') === String(rec.name || '') &&
+        String(p.number || '') === String(rec.number || '') &&
+        String(p.role || '') === String(rec.role || '')
+      ));
+
+      localStorage.setItem(KEY, JSON.stringify(list));
+
+      // cập nhật lại lastEntryIndex (cho result.html)
+      if (list.length === 0) {
+        localStorage.removeItem(IDX);
+      } else {
+        localStorage.setItem(IDX, String(list.length - 1));
+      }
+    }
+  } catch (err) {
+    console.error('Lỗi khi đồng bộ localStorage sau khi xóa:', err);
+  }
+
+  alert(`Đã xóa "${rec.name}" khỏi danh sách.`);
+}
+
+
+  // ---- Export CSV ----
+  exportBtn.addEventListener('click', ()=>{
+    const rows = [['#','Tên','Vai trò','Đội','Số','AI SLOGAN','Thời gian']];
+    participants.forEach((p,i)=>{
+      const timeStr = p.createdAt
+        ? (p.createdAt.toDate ? p.createdAt.toDate().toLocaleString() : new Date(p.createdAt).toLocaleString())
+        : '';
+      rows.push([
+        i+1,
+        p.name || '',
+        roleOf(p),
+        teamLabelOf(p),
+        p.number || '',
+        p.slogan || '',
+        timeStr
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'participants-firestore.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // ---- Reset Firestore (xoá hết document) ----
+  resetBtn.addEventListener('click', async ()=>{
+  if(!confirm('XÓA TOÀN BỘ dữ liệu trong Firestore và xoá dữ liệu trên máy hiện tại?')) return;
+
+  // 1) Xoá tất cả documents trong Firestore
+  const batch = writeBatch(db);
+  participants.forEach(p => {
+    batch.delete(doc(db, 'attendees', p.id));
+  });
+  await batch.commit();
+
+  participants = [];
+  renderTeams();
+  renderTable();
+
+  // 2) Xoá luôn localStorage dùng bởi index/btc/result trên MÁY NÀY
+  try {
+    localStorage.removeItem('participants_v1');
+    localStorage.removeItem('lastEntryIndex');
+  } catch (e) {
+    console.error('Không xoá được localStorage:', e);
+  }
+
+  alert('Đã reset dữ liệu Firestore và cache trên trình duyệt này. Vui lòng reload các trang check-in.');
+});
+
+
+  // ---- Sort button ----
+  sortBtn.addEventListener('click', ()=>{
+    if(sortState === null) sortState = 'asc';
+    else if(sortState === 'asc') sortState = 'desc';
+    else sortState = null;
+
+    sortLabel.textContent = sortState === null ? 'Không' : (sortState === 'asc' ? 'Tăng dần' : 'Giảm dần');
+    renderTable();
+  });
+
+  // ---- Init ----
+  (async ()=>{
+    try {
+      await loadFromFirestore();
+    } catch (err){
+      console.error('Lỗi tải Firestore:', err);
+      alert('Không tải được dữ liệu từ Firestore. Kiểm tra rule & mạng.');
+    }
+  })();
+</script>
+<footer class="site-footer">
+  © 2025 Eddy – Web Developer. 47 Slots System.
+</footer>
+</body>
+</html>
