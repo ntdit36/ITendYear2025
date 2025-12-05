@@ -140,18 +140,18 @@
     const arr = loadAll();
     const used = new Set(arr.map(a=>Number(a.number)));
     const unused = [];
-    for(let i=1;i<=TOTAL;i++) if(!used.has(i)) unused.push(i);
+    for(let i=1;i<=TOTAL;i++) if(!used.length || !used.has(i)) unused.push(i);
     if(!unused.length) return null;
     return unused[Math.floor(Math.random()*unused.length)];
   }
 
-  // ============= ID DOCUMENT ĐỌC ĐƯỢC TRONG FIRESTORE =============
+  // ============= TẠO ID DOCUMENT ĐẸP TRONG FIRESTORE =============
   function makeDocIdFrom(rec) {
     const cleanName = rec.name
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // bỏ dấu
       .replace(/[^a-zA-Z0-9]+/g, "_")                  // chỉ chữ/số/_
       .toLowerCase()
-      .slice(0, 20);                                   // cắt cho gọn
+      .slice(0, 20);                                   // cắt ngắn lại
 
     return `${cleanName}_team${rec.team}_no${rec.number}`;
   }
@@ -180,7 +180,7 @@
     });
   }
 
-  // gọi ngay khi load
+  // Gọi realtime listener khi load trang
   listenJoinedCount();
 
   // ============= XỬ LÝ NÚT CHECK-IN =============
@@ -228,7 +228,7 @@
       role: 'GUEST'
     };
 
-    // 1) Lưu localStorage (cho result/admin dùng)
+    // 1) Lưu localStorage (cho result/admin đang dùng)
     all.push(rec);
     saveAll(all);
     setLastIndex(all.length - 1);
@@ -259,12 +259,15 @@
   });
 </script>
 
+
+
 <footer class="site-footer">
   © 2025 Eddy – Web Developer. 47 Slots System.
 </footer>
 
 </body>
 </html>
+
 
 
 
